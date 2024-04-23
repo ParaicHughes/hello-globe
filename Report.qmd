@@ -1,0 +1,233 @@
+---
+title: "The Unfortunate reality of economic disparities"
+subtitle: "Children losing parents during the aids crisis"
+author: "Paraic Hughes"
+date: "2024-04-23"
+format: html
+theme: zephyr
+toc: true
+execute: 
+  echo: false
+  warning: false
+  message: false
+---
+```{r}
+#| label: setup
+#| include: false
+
+#libraries
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(leaflet)
+library(plotly)
+library(scales)
+
+#loading
+unicef_indicator_2_3_ <- read_csv("C:/Users/parai/Downloads/unicef_indicator_2 (3).csv")
+
+unicef_metadata_3_ <- read_csv("C:/Users/parai/Downloads/unicef_metadata (3).csv")
+
+unicef_indicator_1_2_ <- read_csv("C:/Users/parai/Downloads/unicef_indicator_1 (2).csv")
+
+
+# Data Loading and Data Pre-Processing:
+
+unicef_2 <- `unicef_indicator_2_3_`
+unicef_2 <- as.data.frame(unicef_2[,c("time_period", "country","obs_value")])
+head(unicef_2)
+
+# time_period     country obs_value
+# 1        2000 Afghanistan      2000
+# 2        2001 Afghanistan      2300
+# 3        2002 Afghanistan      2700
+# 4        2003 Afghanistan      3100
+# 5        2004 Afghanistan      3600
+# 6        2005 Afghanistan      4100
+
+unicef_3 <- `unicef_metadata_3_`
+
+unicef_1 <- unicef_indicator_1_2_
+```
+## Introduction
+
+In this report, we delve into the profound and often overlooked consequences of the AIDS crisis on the younger generation, particularly focusing on how economic disparities have compounded their plight. Through a series of meticulous visualizations, we will explore the cascading effects that the loss of parents to AIDS has had on children across various economic strata.
+
+The AIDS epidemic, beyond its immediate health ramifications, has triggered a secondary crisis of orphanhood, leaving countless children vulnerable and without the familial support that is vital during formative years. Our analysis aims to illuminate the stark contrast in outcomes between children in affluent regions versus those in economically disadvantaged areas.
+
+As we navigate through the data-driven narratives, we will uncover the interplay between economic conditions and the ability of affected children to secure basic needs, access education, and receive psychosocial support. The visual evidence presented herein not only sheds light on the past and present but also seeks to inform policy and humanitarian efforts moving forward
+
+## Visualizations 
+
+```{r echo=FALSE, results='hide'}
+#| fig-cap: This is a detailed map that provides a detailed account on the GDP per capita for different countries. This visualization is important becasue it gives the viewer an account on which areas are suffering in terms of wealth. As you will see in the later visualizations that there is an unfortunate correlation between poorer countries and the amount of children that lost their parent to the aids Crisis. 
+
+#Map
+unicef_1 <- unicef_indicator_1_2_
+unicef_2 <- unicef_2 %>%
+  mutate(obs_value = as.numeric(obs_value))
+
+Map_joining_1 <- full_join(unicef_1, unicef_2)
+Map_joining_1 <- full_join(unicef_1, unicef_2, by = join_by("country", "time_period"))
+
+Map_joining_1 <- full_join(unicef_1, unicef_3, by = c("country", "time_period" = "year"))
+
+Map_joining_1 <- unicef_1 %>%
+  full_join(unicef_2, by = c("country", "time_period")) %>%
+  full_join(unicef_3, by = c("country", "time_period" = "year"))
+
+map_world <- map_data("world")
+
+to_map_data <- full_join(Map_joining_1, map_world, by = c("country" = "region"))
+
+ggplot(to_map_data) +
+  aes(x = long, y = lat, group = group, fill = obs_value.x) +
+  geom_polygon(color = "white") + 
+  labs(
+    fill = "GDP per capita",
+    title = "World Map of GDP per Capita") + 
+  theme_classic()
+```
+
+
+```{r}
+#| fig-cap: As can be seen from this scatterplot, Northern hemisphere countries such as Netherlands, France, Bulgaria, Germany, the severity of the aids crisis was much less pronounced in these areas. This is reflected in the smaller amounts of children who lost a parent in these areas. These areas had better access to antiretroviral treatments, comprehensive education and prevention programs. They also have better facilities  facilities ensuring children who had lost both parents got the deserved care and assistance they needed. 
+
+average_rise <- unicef_2 %>%
+  mutate(obs_value = as.numeric(obs_value)) %>% #
+  group_by(country) %>%
+  summarise(average_rise = if(n() > 1) mean(diff(obs_value), na.rm = TRUE) else NA_real_)
+
+
+# Filter data for European countries
+european_countries <- c("Germany", "France", "United Kingdom", "Italy", "Spain", "Netherlands", "Belgium", "Sweden", "Poland", "Austria", "Switzerland", "Norway", "Ireland", "Denmark", "Finland", "Portugal", "Greece", "Czech Republic", "Romania", "Hungary", "Slovakia", "Bulgaria", "Croatia", "Estonia", "Slovenia", "Lithuania", "Latvia", "Cyprus", "Luxembourg", "Malta")
+
+european_data <- unicef_2 %>%
+  filter(country %in% european_countries)
+
+# Create scatter plot
+scatterplot_europe <- ggplot(european_data, aes(x = time_period, y = obs_value, color = country)) +
+  geom_point() +
+  labs(title = "Number of Children Affected by AIDS in European Countries",
+       x = "Year",
+       y = "Estimated No. of Children Affected",
+       color = "Country") +
+  theme_minimal()
+
+scatterplot_europe <- scatterplot_europe + theme(
+  axis.text.y = element_blank()) 
+
+plotly_scatterplot_europe <- ggplotly(scatterplot_europe)
+
+plotly_scatterplot_europe
+```
+
+
+```{r}
+#| fig-cap: This visualization displays the opposite side of the story. Aids disproportionately affects poorer countries due to limited healthcare resources and lack of sex education to help prevent it's transmission. Countries like South Africa who had 28,620,000 children affected between 2000 & 2022 really underscores a less frequnently addressed consequence of the epidemic. It highlights how aids ravaged the most vulnerable parts of society, leaving a profound and lasting impact on the younger generation. 
+
+#aggregate data
+country_totals <- unicef_2 %>%
+  mutate(obs_value_numeric = as.numeric(as.character(obs_value))) %>%
+  group_by(country) %>%
+  summarise(total_affected = sum(obs_value_numeric, na.rm = TRUE))
+
+# Select top 15 countries with highest total number of affected children
+top_15_countries <- country_totals %>%
+  top_n(15, total_affected) %>%
+  filter(country != "Uzbekistan")
+
+# Create bar chart 
+
+barplot_top_15_countries <- ggplot(top_15_countries, aes(x = reorder(country, total_affected), y = total_affected, fill = total_affected)) +
+  geom_bar(stat = "identity") +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") +
+  labs(title = "Top 15 Countries with Highest Number of Children Affected by AIDS 2000 - 2022",
+       x = "Country",
+       y = "Total No. of Children Affected") +
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+barplot_top_15_countries <- ggplot(top_15_countries, aes(x = reorder(country, total_affected), y = total_affected, fill = total_affected)) +
+  geom_bar(stat = "identity") +
+  scale_fill_gradientn(colors = c("lightblue", "darkblue"), 
+                       values = rescale(c(min(top_15_countries$total_affected), max(top_15_countries$total_affected))),
+                       breaks = c(0, 10000000, 20000000, 30000000),
+                       labels = c("0", "10,000,000", "20,000,000", "30,000,000")) +
+  labs(title = "Top 15 Countries with Highest Number of Children Affected by AIDS 2000 - 2022",
+       x = "Country",
+       y = "Total No. of Children Affected") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_y_continuous(labels = label_comma())
+
+plotly_barchart <- ggplotly(barplot_top_15_countries)
+
+plotly_barchart
+
+```
+
+
+```{r}
+
+# Scatter Plot regression line 
+
+# Filter the data for South Africa
+south_africa_data<- unicef_3 %>%
+  filter(country == "South Africa")
+
+# Create a scatter plot of GDP per capita vs. life expectancy for South Africa with a regression line
+scatterplot_gdp_life_expectancy_south_africa <- ggplot(south_africa_data, aes(x = `GDP per capita (constant 2015 US$)`, y = `Life expectancy at birth, total (years)`
+)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "darkred") +  # Add linear regression line
+  labs(title = "Scatter Plot of GDP per Capita vs. Life Expectancy (South Africa)",
+       x = "GDP per Capita",
+       y = "Life Expectancy") +
+  theme_minimal()
+
+#plotly
+plotly_South_Africa <- ggplotly(scatterplot_gdp_life_expectancy_south_africa)
+
+plotly_South_Africa
+
+```
+
+
+
+
+
+```{r}
+
+
+
+# Filter the data for Ireland
+ireland_data <- unicef_3 %>%
+  filter(country == "Ireland")
+
+# Create a scatter plot of GDP per capita vs. life expectancy for Ireland with a regression line
+scatterplot_gdp_life_expectancy_ireland <- ggplot(ireland_data, aes(x = `GDP per capita (constant 2015 US$)`, y = `Life expectancy at birth, total (years)`
+)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "darkred") +  # Add linear regression line
+  labs(title = "Scatter Plot of GDP per Capita vs. Life Expectancy (Ireland)",
+       x = "GDP per Capita",
+       y = "Life Expectancy") +
+  theme_minimal()
+
+#plotly
+plotly_Ireland <- ggplotly(scatterplot_gdp_life_expectancy_ireland)
+
+plotly_Ireland
+
+```
+
+
+The reason for the display of two regression lines was to reveal the stark economic contrasts: Ireland's GDP per capita far exceeds South Africa's. This wealth correlates with higher life expectancies in Ireland, suggesting superior healthcare and living standards. Despite differing economies, both show a positive link between financial health and lifespan. However, variations in the data imply that other elements, including healthcare accessibility and societal issues, notably South Africa's HIV/AIDS impact, also influence life expectancy. Understanding these graphs requires considering broader historical and social contexts beyond the economic data presented. During epidemics, the condition of a region's economy can significantly determine its ability to cope and respond effectively. Hence why, kids in poorer regions suffered the most.
+
+```{r}
+```
+## Conclusion and Recommendations 
+In conclusion, this report has laid bare the severe impact of the AIDS crisis on children, particularly how it has been exacerbated by economic disparity. The visualizations underscore a somber reality: in the shadow of this epidemic, a generation of children has faced compounded adversity due to the loss of parental care. The insights gleaned call for an urgent, compassionate response to address the disparities and support the resilience and recovery of these young lives. As we look ahead, let us commit to transformative actions that can rebuild the promise of a brighter future for the children who carry the silent burden of this crisis. 
+
+```{r}
